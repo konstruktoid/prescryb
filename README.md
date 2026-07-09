@@ -1,5 +1,9 @@
 # prescryb - A remediation orchestrator
 
+See [`OVERVIEW.md`](OVERVIEW.md) for a high-level description of the
+repository's purpose, components, and scope before making behavioral
+changes.
+
 A remediation orchestrator, exposed as an MCP server. Point an MCP client
 (Claude Desktop, Claude Code, etc.) at it and ask, conversationally:
 
