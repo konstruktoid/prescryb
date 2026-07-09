@@ -4,8 +4,9 @@ See [`OVERVIEW.md`](OVERVIEW.md) for a high-level description of the
 repository's purpose, components, and scope before making behavioral
 changes.
 
-A remediation orchestrator, exposed as an MCP server. Point an MCP client
-(Claude Desktop, Claude Code, etc.) at it and ask, conversationally:
+A remediation orchestrator, exposed as an MCP server. Connect an MCP client
+(Claude Desktop, Claude Code, or similar) and submit a natural-language
+request, for example:
 
 > Log into host a.b.c, check installed packages, find CVEs, and suggest a
 > fix - Ansible if possible, and tell me what compliance controls it maps to.
@@ -29,10 +30,10 @@ generation.
 | `list_cce_targets()` | List every platform `lookup_cce` can query. |
 | `generate_playbook(system, cve_matches, compliance_areas, hosts_alias)` | Render a **suggest-only** Ansible playbook: CVE fixes become package-upgrade tasks, compliance areas become `roles:` references. |
 
-Typical flow: `inventory_host` → `check_cves` on the returned packages →
-optionally `fetch_advisory` on interesting CVEs → `map_compliance` (and
-`lookup_cce`) for any insecure-config areas noticed → `generate_playbook`
-to produce something to review.
+Typical flow: `inventory_host`, then `check_cves` on the returned packages,
+then optionally `fetch_advisory` on interesting CVEs, then `map_compliance`
+(and `lookup_cce`) for any insecure-config areas noticed, then
+`generate_playbook` to produce something to review.
 
 ## Install
 
@@ -71,7 +72,7 @@ credentials must never flow through them. Auth works exactly like running
 - Host/user/port/identity files are resolved from `~/.ssh/config`.
 - Keys come from an SSH agent or the default identity files.
 - `inventory_host`'s `hostname`/`identity_file` arguments override the
-  resolved address/key path directly, for hosts you don't want to add to
+  resolved address/key path directly, for hosts you do not want to add to
   `~/.ssh/config` (only a path is passed, never key contents).
 - Unknown host keys are **rejected** unless you pass `trust_unknown_host=True`
   - prefer running `ssh host` manually once to pin the key instead.
@@ -87,13 +88,13 @@ write the playbook suggestion to /tmp/ and print the file location'
 ## Example: checking a regular host
 
 For a host already reachable via `ssh` (resolved through `~/.ssh/config`,
-an agent key, or your default identity file), just name it - no port or
-identity file juggling needed:
+an agent key, or the default identity file), specify the hostname
+directly; no port or identity-file configuration is required:
 
 > Inventory prod-web-01, check installed packages, find CVEs, and suggest a
 > fix - Ansible if possible, and tell me what compliance controls it maps to.
 
-If the host isn't in `~/.ssh/config` yet, either add a `Host` block or pass
+If the host is not in `~/.ssh/config` yet, either add a `Host` block or pass
 `user`/`port`/`hostname`/`identity_file` straight to `inventory_host` for a
 one-off connection - same as the molecule example below.
 
@@ -114,8 +115,8 @@ straight to `inventory_host` for a one-off, ephemeral connection:
 > and suggest a fix - Ansible if possible, and tell me what compliance
 > controls it maps to.
 
-Run `molecule destroy -s default` when you're done - `prescryb` won't do it
-for you, and won't touch the instance beyond reading it.
+Run `molecule destroy -s default` when finished; `prescryb` will not do it
+for you, and will not touch the instance beyond reading it.
 
 ## Compliance mapping
 
@@ -132,7 +133,7 @@ export HARDENING_COLLECTION_REPO=owner/repo
 ```
 
 Set `GITHUB_TOKEN` to raise the (otherwise low) unauthenticated GitHub API
-rate limit. If a role isn't found in the repo, `map_compliance` still
+rate limit. If a role is not found in the repo, `map_compliance` still
 returns the topic/framework/role name so you know what to install
 (`ansible-galaxy collection install konstruktoid.hardening`).
 
@@ -166,13 +167,13 @@ export CCE_REPO=owner/repo
 
 Alongside CIS/DISA STIG, `map_compliance` and `generate_playbook` also cite
 the [MITRE ATT&CK](https://attack.mitre.org) technique(s) mitigated by a
-topic area's hardening (e.g. "ssh" → `T1110` Brute Force, `T1021.004`
-Remote Services: SSH) and, where ATT&CK defines one, the corresponding
-mitigation (e.g. `M1032` Multi-factor Authentication) with a link to
-attack.mitre.org. Unlike CIS/DISA STIG rule numbers, ATT&CK technique and
-mitigation IDs are MITRE's own public catalog, so they're cited directly
-rather than needing a licensed benchmark lookup. This mapping is static
-(built into `attack.py`), not fetched live.
+topic area's hardening (e.g. "ssh" maps to `T1110` Brute Force and
+`T1021.004` Remote Services: SSH) and, where ATT&CK defines one, the
+corresponding mitigation (e.g. `M1032` Multi-factor Authentication) with a
+link to attack.mitre.org. Unlike CIS/DISA STIG rule numbers, ATT&CK
+technique and mitigation IDs are MITRE's own public catalog, so they are
+cited directly rather than needing a licensed benchmark lookup. This mapping
+is static (built into `attack.py`), not fetched live.
 
 ## CVE data sources and their limits
 
@@ -189,7 +190,7 @@ rather than needing a licensed benchmark lookup. This mapping is static
   rate limit.
 - Severity: OSV gives a raw CVSS vector string (`cvss_vector`), not a
   precomputed label, for most OS-package entries. `severity` is only
-  populated when the source explicitly labels it; otherwise it's
+  populated when the source explicitly labels it; otherwise it is
   `"UNKNOWN"` and the vector is left for you (or the model) to interpret,
   rather than guessing.
 
@@ -203,7 +204,7 @@ running it anywhere.
 Package-upgrade tasks use the module for the target's package manager
 (`ansible.builtin.apt`/`dnf`/`zypper`/`community.general.apk`). Version pins
 are only applied where the module supports them; Arch/pacman targets get
-`state: latest` since pacman doesn't support the same pinning syntax.
+`state: latest` since pacman does not support the same pinning syntax.
 
 ## Environment variables
 
@@ -214,9 +215,10 @@ are only applied where the module supports them; Arch/pacman targets get
 | `GITHUB_TOKEN` | unset | Raises GitHub API rate limits for `map_compliance`, `lookup_cce`, and `list_cce_targets`. |
 | `NVD_API_KEY` | unset | Raises NVD API rate limits for `fetch_advisory`. |
 
-## What this deliberately doesn't do
+## What this deliberately does not do
 
-- Doesn't apply playbooks or otherwise mutate the target host.
-- Doesn't accept passwords as tool arguments.
-- Doesn't fabricate CIS/DISA STIG rule numbers.
-- Doesn't guess CVEs for ecosystems OSV doesn't cover - it says so instead.
+- Does not apply playbooks or otherwise mutate the target host.
+- Does not accept passwords as tool arguments.
+- Does not fabricate CIS/DISA STIG rule numbers.
+- Does not guess CVEs for ecosystems OSV does not cover; it reports that
+  instead.
