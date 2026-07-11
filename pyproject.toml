@@ -20,7 +20,7 @@ prescryb = "prescryb.server:main"
 [project.optional-dependencies]
 test = [
     "ruff>=0.15.20",
-    "ty>=0.0.57",
+    "ty>=0.0.58",
 ]
 
 [build-system]
