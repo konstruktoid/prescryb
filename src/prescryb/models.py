@@ -40,6 +40,8 @@ class CVEMatch:
     summary: str
     references: list[str] = field(default_factory=list)
     source: str = "osv"  # "osv" | "nvd"
+    epss_score: float | None = None  # probability of exploitation in the next 30 days
+    epss_percentile: float | None = None  # rank vs. all other scored CVEs
 
 
 @dataclass

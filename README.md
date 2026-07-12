@@ -23,8 +23,9 @@ generation.
 | Tool | What it does |
 | --- | --- |
 | `inventory_host(host, user="", port=22, hostname="", identity_file="", trust_unknown_host=False)` | SSH in, detect the distro, list installed packages with versions. |
-| `check_cves(system, packages)` | Batch-match package versions against [OSV.dev](https://osv.dev) using its ecosystem-aware version comparison (not name-only matching). |
+| `check_cves(system, packages)` | Batch-match package versions against [OSV.dev](https://osv.dev) using its ecosystem-aware version comparison (not name-only matching). Each match is enriched with an EPSS exploitation-probability score. |
 | `fetch_advisory(cve_id)` | Fetch the current NVD record for one CVE - description, CVSS, CWE, references - live, not from training data. |
+| `fetch_epss(cve_ids)` | Batch-fetch [EPSS](https://www.first.org/epss/api) exploitation-probability scores for CVE IDs not already covered by `check_cves` (e.g. from `fetch_advisory` or a web search). |
 | `map_compliance(area)` | Map a free-text topic (`"ssh"`, `"sudo"`, `"kernel modules"`, ...) to CIS/DISA STIG topic areas and, if present in the `konstruktoid.hardening` GitHub repo, the matching role - plus the MITRE ATT&CK techniques and mitigations that area addresses. |
 | `lookup_cce(target, keyword, cve_id)` | Look up [NIST CCE](https://ncp.nist.gov/cce) (Common Configuration Enumeration) entries for a platform (e.g. `"rhel8"`), sourced from the community JSON conversion at [`konstruktoid/cce-web`](https://github.com/konstruktoid/cce-web). |
 | `list_cce_targets()` | List every platform `lookup_cce` can query. |
@@ -188,6 +189,15 @@ is static (built into `attack.py`), not fetched live.
 - **NVD** (`fetch_advisory`) is used only to enrich a CVE you already have
   the ID for. Set `NVD_API_KEY` to raise the (otherwise low) unauthenticated
   rate limit.
+- **EPSS** (`epss_score`/`epss_percentile` on every `check_cves` match, or
+  `fetch_epss` for CVE IDs from elsewhere) estimates the probability of
+  exploitation in the next 30 days - independent of, and a useful
+  complement to, CVSS/severity: a LOW-severity CVE can carry a high EPSS
+  score, and vice versa. This lets findings be sorted/filtered by `cve_id`,
+  `severity`, or `epss_score`. No API key needed. CVEs with no EPSS record
+  (very new, reserved, or rejected IDs) simply have `epss_score` unset -
+  not an error. A FIRST.org outage surfaces as a `warning` on `check_cves`
+  rather than failing the CVE match itself.
 - Severity: OSV gives a raw CVSS vector string (`cvss_vector`), not a
   precomputed label, for most OS-package entries. `severity` is only
   populated when the source explicitly labels it; otherwise it is

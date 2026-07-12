@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 if TYPE_CHECKING:
-    from prescryb.models import Finding, SystemInfo
+    from prescryb.models import CVEMatch, Finding, SystemInfo
 
 _PKG_MODULE = {
     "debian": "ansible.builtin.apt",
@@ -52,6 +52,12 @@ def _pkg_module(os_family: str) -> str:
     return _PKG_MODULE.get(os_family, "ansible.builtin.package")
 
 
+def _epss_suffix(c: CVEMatch) -> str:
+    if c.epss_score is None or c.epss_percentile is None:
+        return ""
+    return f" (EPSS {c.epss_score:.2f}, {c.epss_percentile:.0%}ile)"
+
+
 def _cve_tasks(system: SystemInfo, findings: list[Finding]) -> list[dict]:
     module = _pkg_module(system.os_family)
     tasks = []
@@ -62,7 +68,7 @@ def _cve_tasks(system: SystemInfo, findings: list[Finding]) -> list[dict]:
         target = c.fixed_version or "latest available"
         name = (
             f"Upgrade {f.package} ({c.installed_version} -> {target}) "
-            f"- fixes {c.cve_id} [{c.severity}]"
+            f"- fixes {c.cve_id} [{c.severity}]{_epss_suffix(c)}"
         )
         tasks.append(
             {
@@ -120,7 +126,8 @@ def _build_header(
         if f.kind == "cve" and f.cve:
             summary = f.cve.summary[:140]
             header.append(
-                f"# {f.cve.cve_id} ({f.cve.severity}) on {f.package}: {summary}"
+                f"# {f.cve.cve_id} ({f.cve.severity}){_epss_suffix(f.cve)} "
+                f"on {f.package}: {summary}"
             )
             header.extend(f"#   ref: {ref}" for ref in f.cve.references[:3])
         else:
@@ -164,4 +171,16 @@ def build_playbook(
 
     header = _build_header(system, findings, tasks, seen_roles, attack_lines)
     body = yaml.dump([play], sort_keys=False, default_flow_style=False, width=100)
+    body = _blank_line_between_tasks(body)
     return "\n".join(header) + "\n---\n" + body
+
+
+def _blank_line_between_tasks(body: str) -> str:
+    """Insert a blank line before each task item (but not the first) for readability."""
+    lines = body.splitlines()
+    out: list[str] = []
+    for line in lines:
+        if line.startswith("  - name: ") and out and out[-1].strip() != "tasks:":
+            out.append("")
+        out.append(line)
+    return "\n".join(out) + "\n"
