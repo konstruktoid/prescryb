@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from prescryb import epss
 from prescryb.models import CVEMatch, Package, SystemInfo
 
 if TYPE_CHECKING:
@@ -145,10 +146,10 @@ def _extract_severity(vuln: dict) -> tuple[str, str | None]:
 async def check_cves(
     system: SystemInfo, packages: list[Package]
 ) -> tuple[list[CVEMatch], str | None]:
-    """Query OSV for every package.
+    """Query OSV for every package, then enrich matches with EPSS scores.
 
-    Returns (matches, warning) - warning is set for unmapped/low-confidence
-    ecosystems so callers can surface that honestly.
+    Returns (matches, warning) - warning covers unmapped/low-confidence
+    ecosystems or a failed EPSS lookup.
     """
     ecosystem = resolve_ecosystem(system)
     if ecosystem is None:
@@ -197,4 +198,9 @@ async def check_cves(
                     source="osv",
                 )
             )
+
+    epss_warning = await epss.annotate_matches(matches)
+    if epss_warning:
+        warning = f"{warning} {epss_warning}" if warning else epss_warning
+
     return matches, warning

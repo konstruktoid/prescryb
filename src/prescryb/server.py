@@ -14,7 +14,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from prescryb import advisories, attack, cce, compliance, ssh
+from prescryb import advisories, attack, cce, compliance, epss, ssh
 from prescryb import cve as cve_mod
 from prescryb import playbook as playbook_mod
 from prescryb.models import CVEMatch, Finding, Package, SystemInfo
@@ -24,8 +24,11 @@ mcp = FastMCP(
     instructions=(
         "Remediation orchestrator. Typical flow: 1) inventory_host to SSH in and "
         "list packages, 2) check_cves to match installed versions against known "
-        "vulnerabilities, 3) fetch_advisory for authoritative up-to-date detail on "
-        "a specific CVE you want to discuss, 4) map_compliance to see which "
+        "vulnerabilities (each match includes an EPSS exploitation-probability "
+        "score alongside severity, so findings can be sorted/filtered by either), "
+        "3) fetch_advisory for authoritative up-to-date detail on "
+        "a specific CVE you want to discuss (or fetch_epss for EPSS scores on "
+        "CVE IDs from elsewhere), 4) map_compliance to see which "
         "CIS/DISA STIG topic areas and hardening-collection roles relate to an "
         "area (e.g. 'ssh', 'sudo', 'kernel'), plus the MITRE ATT&CK techniques and "
         "mitigations it addresses, 5) lookup_cce for NIST Common Configuration "
@@ -58,6 +61,8 @@ def _cve_from_dict(d: dict[str, Any]) -> CVEMatch:
         summary=d.get("summary", ""),
         references=d.get("references", []),
         source=d.get("source", "osv"),
+        epss_score=d.get("epss_score"),
+        epss_percentile=d.get("epss_percentile"),
     )
 
 
@@ -111,9 +116,9 @@ async def check_cves(
     """Match installed package versions against known CVEs via OSV.dev.
 
     `system` and `packages` are the objects returned by inventory_host (or a
-    filtered subset of `packages` if you only want to check specific ones).
-    Uses OSV's server-side ecosystem-aware version comparison rather than
-    name-only matching, so results reflect the exact installed version.
+    filtered subset of `packages`). Matches are enriched with
+    `epss_score`/`epss_percentile` (see fetch_epss); a FIRST.org outage
+    degrades to unset EPSS fields plus a `warning`, not a failed match.
     """
     sys_obj = _system_from_dict(system)
     pkg_objs = [
@@ -138,6 +143,23 @@ async def fetch_advisory(cve_id: str) -> dict[str, Any]:
     potentially stale training data.
     """
     return await advisories.fetch_advisory(cve_id)
+
+
+@mcp.tool()
+async def fetch_epss(cve_ids: list[str]) -> dict[str, Any]:
+    """Fetch EPSS scores for CVE IDs not already scored by check_cves.
+
+    Unscored CVE IDs (too new, reserved, rejected) are absent from
+    `scores`, not an error.
+    """
+    scores = await epss.fetch_epss_scores(cve_ids)
+    return {
+        "scores": {
+            cve_id: {"epss_score": score, "epss_percentile": percentile}
+            for cve_id, (score, percentile) in scores.items()
+        },
+        "not_found": sorted({c.upper() for c in cve_ids if c} - scores.keys()),
+    }
 
 
 @mcp.tool()
