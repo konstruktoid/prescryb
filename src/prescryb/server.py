@@ -12,14 +12,14 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from prescryb import advisories, attack, cce, compliance, epss, ssh
 from prescryb import cve as cve_mod
 from prescryb import playbook as playbook_mod
 from prescryb.models import CVEMatch, Finding, Package, SystemInfo
 
-mcp = FastMCP(
+mcp = MCPServer(
     "prescryb",
     instructions=(
         "Remediation orchestrator. Typical flow: 1) inventory_host to SSH in and "
