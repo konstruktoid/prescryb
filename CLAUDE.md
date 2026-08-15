@@ -45,7 +45,11 @@ editing them locally.
 - `python-secure-coding` / `python-testing` — extend the ruff/ty baseline in
   `instructions/python_coding_instructions.md`, which is the source of truth
   for it. Consult them before changing anything under `src/`.
-- `github-actions-security` — applies to `.github/workflows/**`.
+- `github-actions-security` — applies to `.github/workflows/**`, to any `action.yml` or
+  `action.yaml`, to a workflow that calls a reusable workflow, and to `.github/dependabot.yml`
+  entries for the `github-actions` ecosystem. Routing it at workflows alone would let a change
+  to any of the others skip the action-pinning, least-privilege, trigger, runner, and
+  supply-chain checks.
 
 ## Conventions
 
