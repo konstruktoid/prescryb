@@ -34,6 +34,23 @@ justified with a one-line comment explaining why the check is a false
 positive. Do not weaken `pyproject.toml` lint/type config to make a failure
 go away.
 
+## Agent skills and instructions
+
+Skills live in `.agents/skills/`, with `.claude/skills/<name>` symlinked to
+each so Claude Code still discovers them. Both are vendored from
+[konstruktoid/agent-instructions-skills](https://github.com/konstruktoid/agent-instructions-skills)
+and carry the upstream commit in a header comment — re-vendor rather than
+editing them locally.
+
+- `python-secure-coding` / `python-testing` — extend the ruff/ty baseline in
+  `instructions/python_coding_instructions.md`, which is the source of truth
+  for it. Consult them before changing anything under `src/`.
+- `github-actions-security` — applies to `.github/workflows/**`, to any `action.yml` or
+  `action.yaml`, to a workflow that calls a reusable workflow, and to `.github/dependabot.yml`
+  entries for the `github-actions` ecosystem. Routing it at workflows alone would let a change
+  to any of the others skip the action-pinning, least-privilege, trigger, runner, and
+  supply-chain checks.
+
 ## Conventions
 
 - Python >=3.12, managed with `uv` (`uv sync`, `uv run ...`).
