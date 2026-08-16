@@ -19,7 +19,7 @@ prescryb = "prescryb.server:main"
 
 [project.optional-dependencies]
 test = [
-    "ruff>=0.15.22",
+    "ruff>=0.16.2",
     "ty>=0.0.69",
 ]
 
@@ -31,6 +31,7 @@ build-backend = "uv_build"
 select = ["ALL"]
 ignore = [
     "COM812", # conflicts with ruff format's trailing-comma handling
+    "CPY001", # project does not use per-file copyright headers
     "D203",   # incompatible with D211 (no-blank-line-before-class), which we use instead
     "D213",   # incompatible with D212 (multi-line-summary-first-line), which we use instead
 ]
