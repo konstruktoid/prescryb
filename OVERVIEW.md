@@ -64,7 +64,8 @@ topic-level compliance mapping.
 retrieval over documents an operator supplies locally - internal runbooks,
 hardening policy, prior remediation notes - that no public data source knows
 about. Documents are chunked and embedded entirely on the machine running
-`prescryb`; neither their content nor the search query is sent anywhere.
+`prescryb`, with no upload step; the matched excerpts are then returned to
+the calling client as tool output, as every other component's results are.
 This is the one component whose data source is operator-controlled rather
 than a public registry, so it is opt-in (empty until documents are placed
 in the configured directory) and deliberately excluded from version control.

@@ -214,8 +214,8 @@ network-backed tools above: semantic search over documents an operator
 places in a local directory (default `local_docs/`, override with
 `LOCAL_DOCS_DIR`) - internal runbooks, hardening policy, past remediation
 notes - that no public source knows about. Supported formats: Markdown
-(`.md`/`.markdown`), plain text (`.txt`), and PDF (`.pdf`); dotfiles and
-dotdirs (e.g. `.git/`) are skipped.
+(`.md`/`.markdown`), plain text (`.txt`), and PDF (`.pdf`); dotfiles,
+dotdirs (e.g. `.git/`), and symlinks are skipped.
 
 ```console
 mkdir local_docs
@@ -228,11 +228,15 @@ and machine-local, never committed to this repository.
 Documents are split into paragraph-preferring chunks and embedded locally
 with [`sentence-transformers`](https://sbert.net) (default model
 `sentence-transformers/all-MiniLM-L6-v2`, override with `LOCAL_DOCS_MODEL`).
-**No document content or query text leaves the machine** for embedding or
-search - the only network access this feature needs is downloading the model
-weights from Hugging Face the first time it runs; after that first run it's
-fully offline (set `HF_HUB_OFFLINE=1` to force it, once the model is
-cached). The chunk index is rebuilt in memory whenever a file under
+**Embedding and ranking happen entirely on this machine** - the only network
+access this feature needs is downloading the model weights from Hugging Face
+the first time it runs; after that first run indexing and search are fully
+offline (set `HF_HUB_OFFLINE=1` to force it, once the model is cached). That
+is a claim about `prescryb`, not about the client: `search_local_docs`
+returns the matched chunks as its tool result, so the query and those chunks
+reach the connected MCP client and whatever model it is driving, exactly
+like every other tool's output. Put nothing in `LOCAL_DOCS_DIR` you would
+not send to that client. The chunk index is rebuilt in memory whenever a file under
 `LOCAL_DOCS_DIR` is added, removed, or modified, and reused otherwise.
 
 A file that can't be read (e.g. a corrupt PDF), yields no extractable text
@@ -243,8 +247,10 @@ appears in `documents` - it is listed, but none of its content is
 searchable. Indexing is also capped at 500 files: `LOCAL_DOCS_DIR` should
 point at a directory dedicated to this purpose, not something broad like a
 home directory - both caps exist to bound indexing cost and to stop an
-overbroad directory from pulling unrelated local files into search results. Both tools' `truncated`
-field is `true` if the directory has more supported files than that cap.
+overbroad directory from pulling unrelated local files into search results.
+Indexing stops at 5000 chunks overall, whichever files that spans, so a few
+very large documents cannot exhaust memory on their own. Both tools'
+`truncated` field is `true` if either cap left content out of the index.
 
 ### Requirements
 
@@ -256,7 +262,8 @@ field is `true` if the directory has more supported files than that cap.
   embedding model - about 90 MB for the default model, cached under
   `~/.cache/huggingface` (override with `HF_HOME`) so later runs, including
   after a restart, need no network. No connectivity is required beyond that:
-  document content and queries are never sent anywhere.
+  `prescryb` itself sends document content and queries nowhere, though search
+  results do go back to the connected MCP client as tool output.
 - At least one file under `LOCAL_DOCS_DIR` - the tools return an empty
   result, not an error, if the directory is missing or empty.
 
@@ -268,8 +275,9 @@ field is `true` if the directory has more supported files than that cap.
 This drives `inventory_host` and `check_cves` as usual, then
 `search_local_docs` against whatever's in `local_docs/` (e.g. an internal
 Postgres patching runbook) so the connected model can fold that guidance
-into its suggestion alongside the CVE data - all without that runbook ever
-leaving the machine.
+into its suggestion alongside the CVE data. The runbook is never uploaded
+anywhere for indexing; the matched excerpts do reach that model, since
+answering with them is the point.
 
 ## Playbook generation
 

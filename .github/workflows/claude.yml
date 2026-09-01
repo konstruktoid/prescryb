@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   claude:
+    name: Claude
     if: |
       (
         github.event_name == 'issue_comment' &&
@@ -60,14 +61,12 @@ jobs:
             release-assets.githubusercontent.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 1
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@c81e3bc69d1b18badbb63ba39581218f02421678  # v1.0.201
+        uses: anthropics/claude-code-action@c81e3bc69d1b18badbb63ba39581218f02421678
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Alternative for Pro/Max subscribers, generated via `claude setup-token`:
-          # claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

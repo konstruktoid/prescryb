@@ -22,11 +22,12 @@ rationale before making behavioral changes.
 
 ## Required checks
 
-Every change to `src/` must pass both of these before you consider the work
+Every change to `src/` must pass all of these before you consider the work
 done — run them yourself, don't just describe them:
 
 ```console
 uv run ruff check .
+uv run ruff format --check .
 uv run ty check
 ```
 

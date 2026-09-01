@@ -43,6 +43,7 @@ mcp = MCPServer(
 
 
 def _system_from_dict(d: dict[str, Any]) -> SystemInfo:
+    """Rebuild a SystemInfo from an inventory_host result passed back by the client."""
     return SystemInfo(
         hostname=d["hostname"],
         os_family=d["os_family"],
@@ -54,6 +55,7 @@ def _system_from_dict(d: dict[str, Any]) -> SystemInfo:
 
 
 def _cve_from_dict(d: dict[str, Any]) -> CVEMatch:
+    """Rebuild a CVEMatch from a check_cves result passed back by the client."""
     return CVEMatch(
         cve_id=d["cve_id"],
         package=d["package"],
@@ -265,9 +267,9 @@ def list_local_docs() -> dict[str, Any]:
     'local_docs') - runbooks, internal policy, past remediation notes that
     the network-backed tools can't see. `skipped` lists, with the reason,
     each file that could not be read, held no extractable text (a scanned
-    PDF), or exceeded the 20 MB limit; those are not searchable.
-    `truncated` is true past the 500-file cap - point LOCAL_DOCS_DIR at a
-    narrower directory.
+    PDF), or exceeded the 20 MB limit; those are not searchable. Symlinks
+    are not indexed at all. `truncated` is true past the 500-file or
+    5000-chunk cap - point LOCAL_DOCS_DIR at a narrower directory.
     """
     documents, skipped, truncated = docs.list_documents()
     return {
@@ -285,11 +287,12 @@ def search_local_docs(query: str, top_k: int = 5) -> dict[str, Any]:
 
     Embeds `query` and every document chunk under LOCAL_DOCS_DIR with a
     local sentence-transformers model and returns the top_k most similar
-    chunks, e.g. a runbook paragraph on the CVE under discussion. Content
-    and query never leave the machine; the model is downloaded from Hugging
-    Face on first use. No matches means nothing is indexed - call
-    list_local_docs to check. `truncated` is true if the 500-file index cap
-    left some documents unsearched.
+    chunks, e.g. a runbook paragraph on the CVE under discussion. Indexing
+    and ranking are local and need no network beyond downloading the model
+    from Hugging Face on first use; the matched chunks are returned to you
+    like any other tool result. No matches means nothing is indexed - call
+    list_local_docs to check. `truncated` is true if the 500-file or
+    5000-chunk index cap left some content unsearched.
     """
     matches, truncated = docs.search(query, top_k=top_k)
     return {

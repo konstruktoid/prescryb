@@ -93,6 +93,14 @@ def test_iter_files_excludes_symlink_escaping_root(tmp_path: Path) -> None:
     assert docs._iter_files(root) == []
 
 
+def test_iter_files_excludes_symlink_inside_root(tmp_path: Path) -> None:
+    (tmp_path / "real.md").write_text("SSH hardening notes")
+    (tmp_path / "alias.md").symlink_to(tmp_path / "real.md")
+
+    found = {p.relative_to(tmp_path) for p in docs._iter_files(tmp_path)}
+    assert found == {Path("real.md")}
+
+
 def test_chunk_text_empty_input() -> None:
     assert docs._chunk_text("") == []
     assert docs._chunk_text("   \n\n  ") == []
@@ -140,8 +148,7 @@ def _write_pdf(path: Path, text: str = "") -> None:
     for off in offsets:
         out += f"{off:010d} 00000 n \n".encode()
     out += (
-        f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
-        f"startxref\n{xref}\n%%EOF\n"
+        f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
     ).encode()
     path.write_bytes(bytes(out))
 
@@ -150,14 +157,41 @@ def test_extract_pdf_text_reads_page_text(tmp_path: Path) -> None:
     pdf = tmp_path / "runbook.pdf"
     _write_pdf(pdf, "Rotate all SSH host keys quarterly")
 
-    assert "Rotate all SSH host keys quarterly" in docs._extract_pdf_text(pdf)
+    with pdf.open("rb") as stream:
+        assert "Rotate all SSH host keys quarterly" in docs._extract_pdf_text(stream)
 
 
 def test_extract_pdf_text_empty_for_page_without_text(tmp_path: Path) -> None:
     pdf = tmp_path / "scan.pdf"
     _write_pdf(pdf)
 
-    assert docs._extract_pdf_text(pdf).strip() == ""
+    with pdf.open("rb") as stream:
+        assert docs._extract_pdf_text(stream).strip() == ""
+
+
+def test_open_within_refuses_symlinked_file(tmp_path: Path) -> None:
+    outside = tmp_path / "secret.md"
+    outside.write_text("do not index")
+    root = tmp_path / "root"
+    root.mkdir()
+    link = root / "escape.md"
+    link.symlink_to(outside)
+
+    with pytest.raises(OSError, match=r"symbolic link|Too many levels"):
+        docs._open_within(root, link)
+
+
+def test_open_within_refuses_symlinked_parent_dir(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.md").write_text("do not index")
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "sub").symlink_to(outside, target_is_directory=True)
+
+    # O_NOFOLLOW|O_DIRECTORY reports a symlinked directory as ENOTDIR, not ELOOP.
+    with pytest.raises(OSError, match=r"Not a directory|symbolic link"):
+        docs._open_within(root, root / "sub" / "secret.md")
 
 
 def test_list_documents_skips_pdf_without_extractable_text(
@@ -248,6 +282,21 @@ def test_list_documents_truncates_at_file_count_cap(
     documents, _, truncated = docs.list_documents()
 
     assert len(documents) == cap
+    assert truncated is True
+
+
+def test_build_index_truncates_at_chunk_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cap = 2
+    monkeypatch.setattr(docs, "_MAX_INDEXED_CHUNKS", cap)
+    paragraph = "SSH hardening notes. " * 60
+    (tmp_path / "long.md").write_text("\n\n".join([paragraph] * 6))
+    monkeypatch.setenv("LOCAL_DOCS_DIR", str(tmp_path))
+
+    entries, _, truncated = docs._build_index()
+
+    assert len(entries) == cap
     assert truncated is True
 
 
