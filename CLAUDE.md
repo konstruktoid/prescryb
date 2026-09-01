@@ -17,6 +17,8 @@ rationale before making behavioral changes.
   keyed to the same topic slugs as `compliance.py`.
 - `src/prescryb/playbook.py` — Ansible playbook rendering.
 - `src/prescryb/models.py` — shared data models.
+- `src/prescryb/docs.py` — RAG-style local-document search (`LOCAL_DOCS_DIR`,
+  gitignored); embeddings computed locally, never sent over the network.
 
 ## Required checks
 

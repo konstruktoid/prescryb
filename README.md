@@ -29,11 +29,14 @@ generation.
 | `map_compliance(area)` | Map a free-text topic (`"ssh"`, `"sudo"`, `"kernel modules"`, ...) to CIS/DISA STIG topic areas and, if present in the `konstruktoid.hardening` GitHub repo, the matching role - plus the MITRE ATT&CK techniques and mitigations that area addresses. |
 | `lookup_cce(target, keyword, cve_id)` | Look up [NIST CCE](https://ncp.nist.gov/cce) (Common Configuration Enumeration) entries for a platform (e.g. `"rhel8"`), sourced from the community JSON conversion at [`konstruktoid/cce-web`](https://github.com/konstruktoid/cce-web). |
 | `list_cce_targets()` | List every platform `lookup_cce` can query. |
+| `list_local_docs()` | List documents (Markdown/text/PDF) found under the local, gitignored `LOCAL_DOCS_DIR`. |
+| `search_local_docs(query, top_k=5)` | RAG-style semantic search over those local documents, embedded entirely on-machine. |
 | `generate_playbook(system, cve_matches, compliance_areas, hosts_alias)` | Render a **suggest-only** Ansible playbook: CVE fixes become package-upgrade tasks, compliance areas become `roles:` references. |
 
 Typical flow: `inventory_host`, then `check_cves` on the returned packages,
 then optionally `fetch_advisory` on interesting CVEs, then `map_compliance`
-(and `lookup_cce`) for any insecure-config areas noticed, then
+(and `lookup_cce`) for any insecure-config areas noticed, then optionally
+`search_local_docs` for relevant internal runbook/policy context, then
 `generate_playbook` to produce something to review.
 
 ## Install
@@ -204,6 +207,70 @@ is static (built into `attack.py`), not fetched live.
   `"UNKNOWN"` and the vector is left for you (or the model) to interpret,
   rather than guessing.
 
+## Local documents
+
+`search_local_docs` and `list_local_docs` are a RAG-style complement to the
+network-backed tools above: semantic search over documents an operator
+places in a local directory (default `local_docs/`, override with
+`LOCAL_DOCS_DIR`) - internal runbooks, hardening policy, past remediation
+notes - that no public source knows about. Supported formats: Markdown
+(`.md`/`.markdown`), plain text (`.txt`), and PDF (`.pdf`); dotfiles and
+dotdirs (e.g. `.git/`) are skipped.
+
+```console
+mkdir local_docs
+cp ~/ssh-hardening-runbook.pdf local_docs/
+```
+
+`local_docs/` is already listed in `.gitignore` - these are operator-supplied
+and machine-local, never committed to this repository.
+
+Documents are split into paragraph-preferring chunks and embedded locally
+with [`sentence-transformers`](https://sbert.net) (default model
+`sentence-transformers/all-MiniLM-L6-v2`, override with `LOCAL_DOCS_MODEL`).
+**No document content or query text leaves the machine** for embedding or
+search - the only network access this feature needs is downloading the model
+weights from Hugging Face the first time it runs; after that first run it's
+fully offline (set `HF_HUB_OFFLINE=1` to force it, once the model is
+cached). The chunk index is rebuilt in memory whenever a file under
+`LOCAL_DOCS_DIR` is added, removed, or modified, and reused otherwise.
+
+A file that can't be read (e.g. a corrupt PDF), yields no extractable text
+(e.g. a scanned, image-only PDF that would need OCR first), or exceeds the
+20 MB per-file limit, is skipped rather than failing the whole index;
+`list_local_docs`'s `skipped` field names it and why. A skipped file still
+appears in `documents` - it is listed, but none of its content is
+searchable. Indexing is also capped at 500 files: `LOCAL_DOCS_DIR` should
+point at a directory dedicated to this purpose, not something broad like a
+home directory - both caps exist to bound indexing cost and to stop an
+overbroad directory from pulling unrelated local files into search results. Both tools' `truncated`
+field is `true` if the directory has more supported files than that cap.
+
+### Requirements
+
+- `uv sync` installs `sentence-transformers` and `pypdf`; this pulls in
+  `torch`, so the sync is noticeably larger than the rest of this project's
+  dependencies.
+- Outbound HTTPS to `huggingface.co` the first time `search_local_docs` (or
+  `list_local_docs`, which also builds the index) runs, to download the
+  embedding model - about 90 MB for the default model, cached under
+  `~/.cache/huggingface` (override with `HF_HOME`) so later runs, including
+  after a restart, need no network. No connectivity is required beyond that:
+  document content and queries are never sent anywhere.
+- At least one file under `LOCAL_DOCS_DIR` - the tools return an empty
+  result, not an error, if the directory is missing or empty.
+
+### Example: grounding a fix in an internal runbook
+
+> Check host db-01 for CVEs, and see if our internal runbooks say anything
+> relevant before you suggest a fix.
+
+This drives `inventory_host` and `check_cves` as usual, then
+`search_local_docs` against whatever's in `local_docs/` (e.g. an internal
+Postgres patching runbook) so the connected model can fold that guidance
+into its suggestion alongside the CVE data - all without that runbook ever
+leaving the machine.
+
 ## Playbook generation
 
 Output is always a full playbook as text, prefixed with a comment header
@@ -224,6 +291,8 @@ are only applied where the module supports them; Arch/pacman targets get
 | `CCE_REPO` | `konstruktoid/cce-web` | GitHub `owner/repo` queried for CCE JSON exports by `lookup_cce`/`list_cce_targets`. |
 | `GITHUB_TOKEN` | unset | Raises GitHub API rate limits for `map_compliance`, `lookup_cce`, and `list_cce_targets`. |
 | `NVD_API_KEY` | unset | Raises NVD API rate limits for `fetch_advisory`. |
+| `LOCAL_DOCS_DIR` | `local_docs` | Directory `search_local_docs`/`list_local_docs` read from. |
+| `LOCAL_DOCS_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Hugging Face model ID used to embed local documents. |
 
 ## What this deliberately does not do
 

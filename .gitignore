@@ -12,7 +12,8 @@ wheels/
 # Vagrant
 .vagrant/
 
-# Agent tooling
-# Machine-local settings only. The .claude/skills symlinks and .agents/ tree
-# are tracked, so the layout stays visible to any tool that reads them.
+# Operator-supplied documents for search_local_docs; override with LOCAL_DOCS_DIR.
+/local_docs/
+
+# Machine-local agent settings only; .claude/skills and .agents/ stay tracked.
 .claude/settings.local.json

@@ -60,6 +60,15 @@ implements it.
 entries, a complementary and more granular identifier system than the
 topic-level compliance mapping.
 
+**Local-document search** complements the network-backed sources above with
+retrieval over documents an operator supplies locally - internal runbooks,
+hardening policy, prior remediation notes - that no public data source knows
+about. Documents are chunked and embedded entirely on the machine running
+`prescryb`; neither their content nor the search query is sent anywhere.
+This is the one component whose data source is operator-controlled rather
+than a public registry, so it is opt-in (empty until documents are placed
+in the configured directory) and deliberately excluded from version control.
+
 **Adversary-technique mapping** connects the same topic areas used for
 compliance mapping to the MITRE ATT&CK techniques they mitigate, and to
 the corresponding named mitigations where ATT&CK defines one. Unlike the
