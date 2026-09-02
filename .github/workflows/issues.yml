@@ -4,8 +4,12 @@ on:
   issues:
     types: [opened]
 permissions: {}
+concurrency:
+  group: issues-${{ github.event.issue.number }}
+  cancel-in-progress: false
 jobs:
   auto-assign:
+    name: Auto-assign issue
     permissions:
       issues: write
     runs-on: ubuntu-latest
@@ -20,6 +24,6 @@ jobs:
             github.com:443
 
       - name: 'auto-assign issue'
-        uses: pozil/auto-assign-issue@af6beea6bdf1e8eb373f061c5bc168681fc6d011  # v4.0.1
+        uses: pozil/auto-assign-issue@af6beea6bdf1e8eb373f061c5bc168681fc6d011
         with:
           assignees: konstruktoid

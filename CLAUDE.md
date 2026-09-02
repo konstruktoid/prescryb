@@ -17,14 +17,17 @@ rationale before making behavioral changes.
   keyed to the same topic slugs as `compliance.py`.
 - `src/prescryb/playbook.py` — Ansible playbook rendering.
 - `src/prescryb/models.py` — shared data models.
+- `src/prescryb/docs.py` — RAG-style local-document search (`LOCAL_DOCS_DIR`,
+  gitignored); embeddings computed locally, never sent over the network.
 
 ## Required checks
 
-Every change to `src/` must pass both of these before you consider the work
+Every change to `src/` must pass all of these before you consider the work
 done — run them yourself, don't just describe them:
 
 ```console
 uv run ruff check .
+uv run ruff format --check .
 uv run ty check
 ```
 
