@@ -56,8 +56,11 @@ flowchart TD
     style R fill:#f9f,stroke:#333,stroke-width:1px
 ```
 
-Every box left of `R` is `prescryb`: read-only lookups or pure text/data
-generation. Nothing in this chain touches the target host beyond `inventory_host`'s
+Only the tool boxes are `prescryb`: `inventory_host`, `check_cves`,
+`fetch_advisory`, `map_compliance`/`lookup_cce`, `search_local_docs`, and
+`generate_playbook` - each a read-only lookup or pure text/data generation
+call. The operator and connected model are not part of `prescryb`, and
+nothing in this chain touches the target host beyond `inventory_host`'s
 read-only SSH session - applying the generated playbook is a deliberate,
 separate step the operator takes outside `prescryb`.
 
