@@ -41,10 +41,10 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
-      actions: read
-      id-token: write
+      pull-requests: write # comment on/update the pull request Claude is asked to help with
+      issues: write # comment on/update the issue Claude is asked to help with
+      actions: read # reserved for future claude-code-action workflow-run inspection; unused today
+      id-token: write # required for the Claude GitHub App's OIDC authentication
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
@@ -61,12 +61,12 @@ jobs:
             release-assets.githubusercontent.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@fa2b2666b747000bf42767d1f332065b375e3c8f
+        uses: anthropics/claude-code-action@0a8d3c9443bbff909ab973b6a17a340b913f229f  # v1.0.221
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}

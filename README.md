@@ -27,7 +27,7 @@ generation.
 | `fetch_advisory(cve_id)` | Fetch the current NVD record for one CVE - description, CVSS, CWE, references - live, not from training data. |
 | `fetch_epss(cve_ids)` | Batch-fetch [EPSS](https://www.first.org/epss/api) exploitation-probability scores for CVE IDs not already covered by `check_cves` (e.g. from `fetch_advisory` or a web search). |
 | `map_compliance(area)` | Map a free-text topic (`"ssh"`, `"sudo"`, `"kernel modules"`, ...) to CIS/DISA STIG topic areas and, if present in the `konstruktoid.hardening` GitHub repo, the matching role - plus the MITRE ATT&CK techniques and mitigations that area addresses. |
-| `lookup_cce(target, keyword, cve_id)` | Look up [NIST CCE](https://ncp.nist.gov/cce) (Common Configuration Enumeration) entries for a platform (e.g. `"rhel8"`), sourced from the community JSON conversion at [`konstruktoid/cce-web`](https://github.com/konstruktoid/cce-web). |
+| `lookup_cce(target, keyword, cce_id)` | Look up [NIST CCE](https://ncp.nist.gov/cce) (Common Configuration Enumeration) entries for a platform (e.g. `"rhel8"`), sourced from the community JSON conversion at [`konstruktoid/cce-web`](https://github.com/konstruktoid/cce-web). |
 | `list_cce_targets()` | List every platform `lookup_cce` can query. |
 | `list_local_docs()` | List documents (Markdown/text/PDF) found under the local, gitignored `LOCAL_DOCS_DIR`. |
 | `search_local_docs(query, top_k=5)` | RAG-style semantic search over those local documents, embedded entirely on-machine. |
@@ -38,6 +38,31 @@ then optionally `fetch_advisory` on interesting CVEs, then `map_compliance`
 (and `lookup_cce`) for any insecure-config areas noticed, then optionally
 `search_local_docs` for relevant internal runbook/policy context, then
 `generate_playbook` to produce something to review.
+
+```mermaid
+flowchart TD
+    U["Operator: natural-language request"] --> M["Connected model\n(Claude Desktop / Claude Code)"]
+    M --> A["inventory_host\nSSH in, list packages"]
+    A --> B["check_cves\nOSV.dev match + EPSS score"]
+    B --> C{"Interesting\nCVE?"}
+    C -->|yes| D["fetch_advisory\nNVD detail for one CVE"]
+    C -->|no| E
+    D --> E["map_compliance / lookup_cce\nCIS/DISA STIG + ATT&CK mapping"]
+    E --> F["search_local_docs\ninternal runbooks (optional)"]
+    F --> G["generate_playbook\nsuggest-only Ansible playbook"]
+    G --> H["Model reasons over the results\nand presents findings + playbook"]
+    H --> R["Operator reviews\n(ansible-playbook --check --diff)\nand applies manually"]
+
+    style R fill:#f9f,stroke:#333,stroke-width:1px
+```
+
+Only the tool boxes are `prescryb`: `inventory_host`, `check_cves`,
+`fetch_advisory`, `map_compliance`/`lookup_cce`, `search_local_docs`, and
+`generate_playbook` - each a read-only lookup or pure text/data generation
+call. The operator and connected model are not part of `prescryb`, and
+nothing in this chain touches the target host beyond `inventory_host`'s
+read-only SSH session - applying the generated playbook is a deliberate,
+separate step the operator takes outside `prescryb`.
 
 ## Install
 
@@ -301,6 +326,48 @@ are only applied where the module supports them; Arch/pacman targets get
 | `NVD_API_KEY` | unset | Raises NVD API rate limits for `fetch_advisory`. |
 | `LOCAL_DOCS_DIR` | `local_docs` | Directory `search_local_docs`/`list_local_docs` read from. |
 | `LOCAL_DOCS_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Hugging Face model ID used to embed local documents. |
+
+## Development
+
+Install with the test extras (pytest, ruff, ty, numpy for the local-docs
+tests):
+
+```console
+uv sync --extra test
+```
+
+Before considering any change to `src/` or `tests/` done, run all of:
+
+```console
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check
+uv run pytest
+```
+
+`ruff`/`ty` apply to `tests/` as well as `src/`; `tests/per-file-ignores` in
+`pyproject.toml` only relaxes docstring (`D103`), `assert` (`S101`), and
+private-member-access (`SLF001`) rules there, since those are normal in test
+code.
+
+Test layout: one `tests/test_<module>.py` per `src/prescryb/<module>.py`
+that has coverage, following `pytest`'s plain function style already used
+throughout - no test classes, no third-party mocking/fixture library beyond
+`pytest`'s own `monkeypatch` and `tmp_path`. Network-facing code (`paramiko`,
+`httpx` calls to OSV/NVD/EPSS/GitHub/`cce-web`) is exercised through small
+hand-written fakes substituted via `monkeypatch`, not real sockets. Pure
+data-transform helpers (parsers, extractors, dataclass<->dict round-trips,
+playbook rendering) are called directly.
+
+Coverage is currently uneven: parsing/extraction/rendering logic across
+`ssh.py`, `cve.py`, `playbook.py`, `cce.py`, `server.py`, and all of `docs.py`
+has tests; the async network-calling functions in `epss.py`,
+`advisories.py`, `compliance.py`, and most of `cce.py` (`fetch_target`,
+`list_targets`, `resolve_target`) do not yet - adding those would need an
+`httpx.MockTransport` fixture rather than `monkeypatch` alone.
+
+`.github/workflows/lint.yml` runs `ruff check`, `ruff format --check`,
+`ty check`, `pytest`, and `pip-audit` on every push/PR.
 
 ## What this deliberately does not do
 
