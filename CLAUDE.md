@@ -22,13 +22,14 @@ rationale before making behavioral changes.
 
 ## Required checks
 
-Every change to `src/` must pass all of these before you consider the work
-done — run them yourself, don't just describe them:
+Every change to `src/` or `tests/` must pass all of these before you
+consider the work done — run them yourself, don't just describe them:
 
 ```console
 uv run ruff check .
 uv run ruff format --check .
 uv run ty check
+uv run pytest
 ```
 
 Fix reported issues in the code rather than suppressing them (`# noqa`,
@@ -36,6 +37,11 @@ Fix reported issues in the code rather than suppressing them (`# noqa`,
 justified with a one-line comment explaining why the check is a false
 positive. Do not weaken `pyproject.toml` lint/type config to make a failure
 go away.
+
+A change that adds behavior, fixes a bug, or changes a public interface
+needs a test per the `python-testing` skill below; if none was added, say
+why. `.github/workflows/lint.yml` runs all four checks above (plus
+`pip-audit`) on every push/PR — see `README.md` "Development".
 
 ## Agent skills and instructions
 

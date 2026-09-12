@@ -11,7 +11,7 @@ jobs:
   auto-assign:
     name: Auto-assign issue
     permissions:
-      issues: write
+      issues: write # assign the newly opened issue to the configured assignee
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -24,6 +24,6 @@ jobs:
             github.com:443
 
       - name: 'auto-assign issue'
-        uses: pozil/auto-assign-issue@af6beea6bdf1e8eb373f061c5bc168681fc6d011
+        uses: pozil/auto-assign-issue@af6beea6bdf1e8eb373f061c5bc168681fc6d011  # v4.0.1
         with:
           assignees: konstruktoid
