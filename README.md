@@ -106,12 +106,22 @@ credentials must never flow through them. Auth works exactly like running
 - Unknown host keys are **rejected** unless you pass `trust_unknown_host=True`
   - prefer running `ssh host` manually once to pin the key instead.
 
-## Example: running claude against the repository Vagrant VM
+## Example: running claude against the repository QEMU VMs
+
+`qemu/vm.sh` boots a cloud image (`almalinux10`, `trixie`, `resolute`) under
+QEMU with a cloud-init seed and an SSH port forward on `127.0.0.1`
+(2201, 2202, 2203). It needs `qemu-system-x86_64`, `qemu-img`, `cloud-localds`
+(cloud-image-utils), `curl` and `ssh`; KVM is used when `/dev/kvm` is writable.
+Images are checksum-verified and cached in `qemu/.state/`.
 
 ```console
-claude 'run vagrant up, connect to the created VM, check any vulnerabilities
-and suggest a fix, include compliance mapping if possible,
-write the playbook suggestion to /tmp/ and print the file location'
+qemu/vm.sh up trixie
+qemu/vm.sh ssh trixie true   # retry until the guest answers
+claude 'inventory 127.0.0.1 port 2202 user prescryb with identity file
+qemu/.state/id_ed25519 (trust_unknown_host is fine, it is a throwaway VM),
+check any vulnerabilities and suggest a fix, include compliance mapping if
+possible, write the playbook suggestion to /tmp/ and print the file location'
+qemu/vm.sh destroy trixie
 ```
 
 ## Example: checking a regular host
