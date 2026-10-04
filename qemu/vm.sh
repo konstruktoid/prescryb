@@ -26,14 +26,25 @@ shift 2
 [[ -v HOSTS[$name] ]] || usage
 IFS='|' read -r port image_url sum_url <<<"${HOSTS[$name]}"
 
-base="${STATE}/base/$(basename "${image_url}")"
+base=""
 disk="${STATE}/${name}.qcow2"
 seed="${STATE}/${name}-seed.iso"
 pidfile="${STATE}/${name}.pid"
 key="${STATE}/id_ed25519"
 known_hosts="${STATE}/known_hosts"
 
-running() { [[ -f "${pidfile}" ]] && kill -0 "$(<"${pidfile}")" 2>/dev/null; }
+running() {
+  local pid cmdline
+  [[ -f "${pidfile}" ]] || return 1
+  pid="$(<"${pidfile}")"
+  if [[ ${pid} =~ ^[0-9]+$ && -r /proc/${pid}/cmdline ]]; then
+    cmdline="$(tr '\0' ' ' <"/proc/${pid}/cmdline")"
+    # Only a qemu process booted from this VM's disk counts as this VM.
+    [[ ${cmdline} == *qemu-system*"file=${disk},"* ]] && return 0
+  fi
+  rm -f "${pidfile}"
+  return 1
+}
 
 ssh_base() {
   ssh -i "${key}" -p "${port}" -o IdentitiesOnly=yes \
@@ -41,22 +52,31 @@ ssh_base() {
     "${USER_NAME}@127.0.0.1" "$@"
 }
 
+verify_sum() {
+  local hash="$1" file="$2"
+  if [[ ${#hash} -eq 128 ]]; then
+    printf '%s  %s\n' "${hash}" "${file}" | sha512sum -c --status -
+  else
+    printf '%s  %s\n' "${hash}" "${file}" | sha256sum -c --status -
+  fi
+}
+
+# Sets base to a checksum-verified image named by its hash, so a disk's backing file is never replaced.
 fetch_base() {
-  [[ -f "${base}" ]] && return
   mkdir -p "${STATE}/base"
   local sums file hash tmp
   file="$(basename "${image_url}")"
   sums="$(curl -fsSL "${sum_url}")"
   hash="$(grep -F "${file}" <<<"${sums}" | grep -oE '[0-9a-f]{64,128}' | head -n1)"
   [[ -n "${hash}" ]] || { echo "no checksum for ${file} in ${sum_url}" >&2; exit 1; }
+  base="${STATE}/base/${hash:0:16}-${file}"
+  if [[ -f "${base}" ]] && verify_sum "${hash}" "${base}"; then
+    return
+  fi
   tmp="$(mktemp "${STATE}/base/dl.XXXXXX")"
   trap 'rm -f "${tmp}"' EXIT
   curl -fL -o "${tmp}" "${image_url}"
-  if [[ ${#hash} -eq 128 ]]; then
-    echo "${hash}  ${tmp}" | sha512sum -c -
-  else
-    echo "${hash}  ${tmp}" | sha256sum -c -
-  fi
+  verify_sum "${hash}" "${tmp}" || { echo "checksum mismatch for ${file}" >&2; exit 1; }
   mv "${tmp}" "${base}"
   trap - EXIT
 }
@@ -65,8 +85,10 @@ up() {
   if running; then echo "${name} already running on port ${port}"; return; fi
   mkdir -p "${STATE}"
   [[ -f "${key}" ]] || ssh-keygen -q -t ed25519 -N '' -C prescryb-qemu -f "${key}"
-  fetch_base
-  [[ -f "${disk}" ]] || qemu-img create -q -f qcow2 -F qcow2 -b "${base}" "${disk}" 20G
+  if [[ ! -f "${disk}" ]]; then
+    fetch_base
+    qemu-img create -q -f qcow2 -F qcow2 -b "${base}" "${disk}" 20G
+  fi
   if [[ ! -f "${seed}" ]]; then
     local ud md
     ud="$(mktemp)"
