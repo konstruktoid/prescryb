@@ -9,8 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-# Vagrant
-.vagrant/
+# QEMU test VMs
+/qemu/.state/
 
 # Operator-supplied documents for search_local_docs; override with LOCAL_DOCS_DIR.
 /local_docs/

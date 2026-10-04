@@ -76,7 +76,7 @@ def connect(
     """Open an SSH session via ~/.ssh/config + agent/default keys, like `ssh` itself.
 
     `hostname`/`identity_file` let a caller override the resolved address and
-    key path directly (e.g. a molecule/vagrant instance not in ~/.ssh/config)
+    key path directly (e.g. a molecule/QEMU instance not in ~/.ssh/config)
     without editing that file - only paths, never key material, ever flow
     through these.
     """

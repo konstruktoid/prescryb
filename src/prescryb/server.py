@@ -90,7 +90,7 @@ def inventory_host(
     with `ssh host` once yourself to pin the key instead.
 
     `hostname`/`identity_file` override the resolved address and key path
-    without editing ~/.ssh/config - handy for e.g. a local molecule/vagrant
+    without editing ~/.ssh/config - handy for e.g. a local molecule/QEMU
     instance. Only a path is passed, never key contents.
     """
     session = ssh.connect(
