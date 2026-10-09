@@ -101,7 +101,7 @@ def inventory_host(
     instance. Only a path is passed, never key contents.
     """
     logger.info(
-        "inventory_host: connecting host=%s user=%s port=%d trust_unknown_host=%s",
+        "inventory_host: connecting host=%r user=%r port=%d trust_unknown_host=%s",
         host,
         user or "(default)",
         port,
@@ -117,20 +117,20 @@ def inventory_host(
             trust_unknown_host=trust_unknown_host,
         )
     except Exception:
-        logger.exception("inventory_host: connect failed host=%s", host)
+        logger.exception("inventory_host: connect failed host=%r", host)
         raise
 
     try:
         system = ssh.detect_system(session)
         packages = ssh.inventory_packages(session, system)
     except Exception:
-        logger.exception("inventory_host: inventory failed host=%s", host)
+        logger.exception("inventory_host: inventory failed host=%r", host)
         raise
     finally:
         session.close()
 
     logger.info(
-        "inventory_host: inventoried host=%s distro=%s package_count=%d",
+        "inventory_host: inventoried host=%r distro=%s package_count=%d",
         host,
         system.distro_id,
         len(packages),
