@@ -95,7 +95,7 @@ def test_inventory_host_logs_connection_and_result(
     messages = [record.message for record in caplog.records]
     assert any("connecting host='db1' user='ops'" in m for m in messages)
     assert any(
-        "inventoried host='db1' distro=debian package_count=1" in m for m in messages
+        "inventoried host='db1' distro='debian' package_count=1" in m for m in messages
     )
 
 

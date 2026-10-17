@@ -10,6 +10,7 @@ those controls.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,14 @@ import yaml
 
 if TYPE_CHECKING:
     from prescryb.models import CVEMatch, Finding, SystemInfo
+
+_CONTROL_CHARS_RE = re.compile(r"[\r\n\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _sanitize_comment(text: str) -> str:
+    """Collapse newlines/control chars so untrusted text can't break a `#` line."""
+    return _CONTROL_CHARS_RE.sub(" ", text)
+
 
 _PKG_MODULE = {
     "debian": "ansible.builtin.apt",
@@ -126,14 +135,16 @@ def _build_header(
     ]
     for f in findings:
         if f.kind == "cve" and f.cve:
-            summary = f.cve.summary[:140]
+            summary = _sanitize_comment(f.cve.summary[:140])
             header.append(
                 f"# {f.cve.cve_id} ({f.cve.severity}){_epss_suffix(f.cve)} "
                 f"on {f.package}: {summary}"
             )
-            header.extend(f"#   ref: {ref}" for ref in f.cve.references[:3])
+            header.extend(
+                f"#   ref: {_sanitize_comment(ref)}" for ref in f.cve.references[:3]
+            )
         else:
-            header.append(f"# {f.title}: {f.detail[:140]}")
+            header.append(f"# {f.title}: {_sanitize_comment(f.detail[:140])}")
     if seen_roles:
         header.append("#")
         header.append(
