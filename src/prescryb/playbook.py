@@ -10,6 +10,7 @@ those controls.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,14 @@ import yaml
 
 if TYPE_CHECKING:
     from prescryb.models import CVEMatch, Finding, SystemInfo
+
+_CONTROL_CHARS_RE = re.compile(r"[\r\n\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _sanitize_comment(text: str) -> str:
+    """Collapse newlines/control chars so untrusted text can't break a `#` line."""
+    return _CONTROL_CHARS_RE.sub(" ", text)
+
 
 _PKG_MODULE = {
     "debian": "ansible.builtin.apt",
@@ -147,7 +156,7 @@ def _build_header(
         header.extend(f"#   {line}" for line in attack_lines)
     if not tasks and not seen_roles and not attack_lines:
         header.append("# No actionable findings - nothing to remediate.")
-    return header
+    return [_sanitize_comment(line) for line in header]
 
 
 def build_playbook(
